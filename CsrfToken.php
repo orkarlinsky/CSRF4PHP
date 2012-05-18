@@ -94,7 +94,7 @@ class CsrfToken {
      *  @param integer $len (defaults to 10) length of the generated string
      *  @return string
      */
-    public function randomString($len = 10) {
+    private function randomString($len = 10) {
         // Characters that may look like other characters in different fonts
         // have been omitted.
         $rString = '';
@@ -105,20 +105,6 @@ class CsrfToken {
             $rString .= \substr($chars, $rInt, 1);
         }
         return $rString;
-    }
-
-    /**
-     *  Calculates the SHA1 hash from the csrf token material 
-     *
-     *  The token material is found in $_SESSION['csrf'] array. This function 
-     *  is not used directly. It is called by other public CsrfToken method.
-     *
-     *  @see generateToken(), generateHiddenField(), checkToken()
-     *  @visibility protected
-     *  @return string
-     */
-    protected function calculateHash() {
-        return \sha1(\implode('', $_SESSION['csrf']));
     }
 
     /**
@@ -135,14 +121,13 @@ class CsrfToken {
      */
     public function generateToken() {
         // Create or overwrite the csrf entry in the seesion
-        $_SESSION['csrf'] = array();
+		$hash[] = \time();
+		$hash[] = $this->randomString(32);
+		$hash[] = \session_id();
+		$hash[] = $_SERVER['REMOTE_ADDR'];
+		$hash = \sha1(\implode('', $hash));
         $_SESSION['csrf']['time'] = \time();
-        $_SESSION['csrf']['salt'] = $this->randomString(32);
-        $_SESSION['csrf']['sessid'] = \session_id();
-        $_SESSION['csrf']['ip'] = $_SERVER['REMOTE_ADDR'];
-        // Generate the SHA1 hash
-        $hash = $this->calculateHash();
-        // Generate and return the token
+        $_SESSION['csrf']['hash'] = $hash;
         return \base64_encode($hash);
     }
 
@@ -227,10 +212,9 @@ class CsrfToken {
                     // Decode the received token hash
                     $tokenHash = \base64_decode($_REQUEST['csrf']);
                     // Generate a new hash from the data we have
-                    $generatedHash = $this->calculateHash();
                     // Compare and return the result
-                    if ($tokenHash and $generatedHash) {
-                        return $tokenHash == $generatedHash;
+                    if ($tokenHash and $_SESSION['csrf']['hash']) {
+                        return $tokenHash == $_SESSION['csrf']['hash'];
                     }
                 }
             }
